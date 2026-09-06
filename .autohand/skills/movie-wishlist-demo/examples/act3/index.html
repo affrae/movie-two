@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Wishlist</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Movie Wishlist</h1>
+    <p class="tagline">Search movies and build your wishlist</p>
+  </header>
+
+  <main>
+    <form id="search-form" class="search-form" role="search" aria-label="Search movies">
+      <label class="sr-only" for="search-input">Search for a movie</label>
+      <input
+        type="search"
+        id="search-input"
+        name="query"
+        placeholder="Search for a movie…"
+        autocomplete="off"
+        required
+      >
+      <button type="submit">Search</button>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <div class="layout">
+      <section id="results" class="results" aria-label="Search results">
+        <ul id="poster-grid" class="poster-grid"></ul>
+      </section>
+
+      <aside id="wishlist-panel" class="wishlist-panel" aria-label="My Wishlist">
+        <h2 class="wishlist-title">My Wishlist</h2>
+        <p id="wishlist-empty" class="wishlist-empty">Nothing here yet — click a poster to add it.</p>
+        <ul id="wishlist-list" class="wishlist-list"></ul>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Classic (non-module) scripts so the app works from a file:// URL. -->
+  <script src="config.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

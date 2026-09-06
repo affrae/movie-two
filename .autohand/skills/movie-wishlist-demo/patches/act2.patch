@@ -1,0 +1,400 @@
+--- base/app.js	2026-09-05 21:59:52
++++ new/app.js	2026-09-05 22:15:39
+@@ -1,4 +1,4 @@
+-// Movie Wishlist — TMDb search app (Act I: search only)
++// Movie Wishlist — TMDb search app with in-memory wishlist (Act II)
+ (function () {
+   "use strict";
+ 
+@@ -9,7 +9,12 @@
+   const input = document.getElementById("search-input");
+   const statusEl = document.getElementById("status");
+   const grid = document.getElementById("poster-grid");
++  const wishlistList = document.getElementById("wishlist-list");
++  const wishlistEmpty = document.getElementById("wishlist-empty");
+ 
++  // In-memory wishlist: movieId -> { movie, rating }
++  const wishlist = new Map();
++
+   function setStatus(message, isError) {
+     statusEl.textContent = message;
+     statusEl.classList.toggle("error", Boolean(isError));
+@@ -29,6 +34,28 @@
+     return /^\d{4}$/.test(year) ? year : "";
+   }
+ 
++  function isInWishlist(movieId) {
++    return wishlist.has(String(movieId));
++  }
++
++  function toggleWishlist(movie) {
++    const id = String(movie.id);
++    if (wishlist.has(id)) {
++      wishlist.delete(id);
++    } else {
++      wishlist.set(id, { movie: movie, rating: 0 });
++    }
++    renderWishlist();
++    updateCardState(id);
++  }
++
++  function setRating(movieId, rating) {
++    const entry = wishlist.get(String(movieId));
++    if (!entry) return;
++    entry.rating = rating;
++    renderWishlist();
++  }
++
+   function createCard(movie) {
+     const li = document.createElement("li");
+     li.className = "movie-card";
+@@ -63,9 +90,28 @@
+     info.appendChild(year);
+     li.appendChild(info);
+ 
++    li.addEventListener("click", function () {
++      toggleWishlist(movie);
++    });
++
++    updateCardState(li, movie.id);
+     return li;
+   }
+ 
++  function updateCardState(cardOrId, movieId) {
++    const card =
++      typeof cardOrId === "string"
++        ? grid.querySelector('[data-movie-id="' + cardOrId + '"]')
++        : cardOrId;
++    if (!card) return;
++    const id = String(movieId || card.dataset.movieId);
++    card.classList.toggle("in-wishlist", isInWishlist(id));
++    card.setAttribute(
++      "aria-pressed",
++      isInWishlist(id) ? "true" : "false"
++    );
++  }
++
+   function renderMovies(movies) {
+     grid.replaceChildren();
+     const fragment = document.createDocumentFragment();
+@@ -75,6 +121,94 @@
+     grid.appendChild(fragment);
+   }
+ 
++  function createWishlistItem(entry) {
++    const id = String(entry.movie.id);
++    const li = document.createElement("li");
++    li.className = "wishlist-item";
++    li.dataset.movieId = id;
++
++    const imgUrl = posterUrl(entry.movie.poster_path);
++    if (imgUrl) {
++      const img = document.createElement("img");
++      img.className = "wishlist-item-poster";
++      img.src = imgUrl;
++      img.alt = entry.movie.title;
++      img.loading = "lazy";
++      li.appendChild(img);
++    } else {
++      const placeholder = document.createElement("div");
++      placeholder.className = "wishlist-item-poster no-poster";
++      placeholder.textContent = "No poster";
++      li.appendChild(placeholder);
++    }
++
++    const details = document.createElement("div");
++    details.className = "wishlist-item-details";
++
++    const title = document.createElement("span");
++    title.className = "wishlist-item-title";
++    title.textContent = entry.movie.title;
++
++    const stars = document.createElement("div");
++    stars.className = "stars";
++    stars.setAttribute("role", "radiogroup");
++    stars.setAttribute("aria-label", "Rating for " + entry.movie.title);
++
++    for (let value = 1; value <= 5; value++) {
++      const star = document.createElement("button");
++      star.type = "button";
++      star.className = "star" + (value <= entry.rating ? " active" : "");
++      star.dataset.value = String(value);
++      star.setAttribute("role", "radio");
++      star.setAttribute("aria-checked", value <= entry.rating ? "true" : "false");
++      star.setAttribute("aria-label", value + " star" + (value === 1 ? "" : "s"));
++      star.textContent = "★";
++      stars.appendChild(star);
++    }
++
++    details.appendChild(title);
++    details.appendChild(stars);
++
++    const remove = document.createElement("button");
++    remove.type = "button";
++    remove.className = "wishlist-remove";
++    remove.setAttribute("aria-label", "Remove " + entry.movie.title + " from wishlist");
++    remove.textContent = "✕";
++
++    li.appendChild(details);
++    li.appendChild(remove);
++    return li;
++  }
++
++  function renderWishlist() {
++    wishlistList.replaceChildren();
++    const hasItems = wishlist.size > 0;
++    wishlistEmpty.hidden = hasItems;
++
++    const fragment = document.createDocumentFragment();
++    wishlist.forEach(function (entry) {
++      fragment.appendChild(createWishlistItem(entry));
++    });
++    wishlistList.appendChild(fragment);
++  }
++
++  wishlistList.addEventListener("click", function (event) {
++    const item = event.target.closest(".wishlist-item");
++    if (!item) return;
++    const movieId = item.dataset.movieId;
++
++    if (event.target.classList.contains("star")) {
++      setRating(movieId, Number(event.target.dataset.value));
++    } else if (event.target.classList.contains("wishlist-remove")) {
++      const entry = wishlist.get(movieId);
++      if (entry) {
++        wishlist.delete(movieId);
++        renderWishlist();
++        updateCardState(movieId);
++      }
++    }
++  });
++
+   async function searchMovies(query) {
+     const url =
+       API_BASE +
+@@ -91,6 +225,8 @@
+     return data.results || [];
+   }
+ 
++  renderWishlist();
++
+   form.addEventListener("submit", async function (event) {
+     event.preventDefault();
+ 
+--- base/index.html	2026-09-05 21:59:52
++++ new/index.html	2026-09-05 21:55:21
+@@ -28,9 +28,17 @@
+ 
+     <p id="status" class="status" role="status" aria-live="polite"></p>
+ 
+-    <section id="results" class="results" aria-label="Search results">
+-      <ul id="poster-grid" class="poster-grid"></ul>
+-    </section>
++    <div class="layout">
++      <section id="results" class="results" aria-label="Search results">
++        <ul id="poster-grid" class="poster-grid"></ul>
++      </section>
++
++      <aside id="wishlist-panel" class="wishlist-panel" aria-label="My Wishlist">
++        <h2 class="wishlist-title">My Wishlist</h2>
++        <p id="wishlist-empty" class="wishlist-empty">Nothing here yet — click a poster to add it.</p>
++        <ul id="wishlist-list" class="wishlist-list"></ul>
++      </aside>
++    </div>
+   </main>
+ 
+   <script src="config.js"></script>
+--- base/styles.css	2026-09-05 21:59:52
++++ new/styles.css	2026-09-05 22:15:39
+@@ -1,4 +1,4 @@
+-/* Movie Wishlist styles (Act I: search only) */
++/* Movie Wishlist styles (Act II: search + in-memory wishlist) */
+ 
+ :root {
+   --bg: #14181c;
+@@ -43,6 +43,14 @@
+   padding: 0 1rem 3rem;
+ }
+ 
++/* Two-column layout: results + wishlist */
++.layout {
++  display: grid;
++  grid-template-columns: 1fr 320px;
++  gap: 1.5rem;
++  align-items: start;
++}
++
+ /* Search form */
+ .search-form {
+   display: flex;
+@@ -109,13 +117,39 @@
+ }
+ 
+ .movie-card {
++  position: relative;
+   display: flex;
+   flex-direction: column;
+   background: var(--surface);
+   border-radius: var(--radius);
+   overflow: hidden;
++  cursor: pointer;
++  transition: box-shadow 0.15s ease, transform 0.15s ease;
+ }
+ 
++.movie-card:hover {
++  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
++  transform: translateY(-2px);
++}
++
++.movie-card.in-wishlist {
++  outline: 2px solid var(--accent);
++  outline-offset: -2px;
++}
++
++.movie-card.in-wishlist::after {
++  content: "★ In wishlist";
++  position: absolute;
++  top: 0.5rem;
++  right: 0.5rem;
++  padding: 0.2rem 0.5rem;
++  font-size: 0.7rem;
++  font-weight: 600;
++  color: #14181c;
++  background: var(--accent);
++  border-radius: 999px;
++}
++
+ .movie-card img {
+   width: 100%;
+   aspect-ratio: 2 / 3;
+@@ -153,6 +187,115 @@
+   color: var(--muted);
+ }
+ 
++/* Wishlist panel */
++.wishlist-panel {
++  background: var(--surface);
++  border: 1px solid #2c3640;
++  border-radius: var(--radius);
++  padding: 1rem;
++  position: sticky;
++  top: 1rem;
++}
++
++.wishlist-title {
++  margin: 0 0 0.75rem;
++  font-size: 1.1rem;
++}
++
++.wishlist-empty {
++  margin: 0;
++  color: var(--muted);
++  font-size: 0.9rem;
++}
++
++.wishlist-list {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: flex;
++  flex-direction: column;
++  gap: 0.75rem;
++}
++
++.wishlist-item {
++  display: flex;
++  align-items: flex-start;
++  gap: 0.6rem;
++  padding: 0.5rem 0.6rem;
++  background: var(--bg);
++  border-radius: var(--radius);
++}
++
++.wishlist-item-poster {
++  width: 48px;
++  height: 72px;
++  object-fit: cover;
++  border-radius: 4px;
++  flex-shrink: 0;
++  background: #2c3640;
++}
++
++.wishlist-item-poster.no-poster {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 0.65rem;
++  color: var(--muted);
++  text-align: center;
++}
++
++.wishlist-item-details {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  gap: 0.25rem;
++  min-width: 0;
++}
++
++.wishlist-item-title {
++  font-size: 0.9rem;
++  font-weight: 500;
++  min-width: 0;
++  word-wrap: break-word;
++  overflow-wrap: break-word;
++}
++
++/* Star rating */
++.stars {
++  display: inline-flex;
++  gap: 0.1rem;
++}
++
++.star {
++  padding: 0;
++  border: none;
++  background: none;
++  font-size: 1.1rem;
++  line-height: 1;
++  color: #4a5560;
++  cursor: pointer;
++}
++
++.star:hover,
++.star.active {
++  color: #ffd166;
++}
++
++.wishlist-remove {
++  padding: 0.1rem 0.35rem;
++  border: none;
++  background: none;
++  color: var(--muted);
++  font-size: 0.85rem;
++  cursor: pointer;
++  border-radius: 4px;
++}
++
++.wishlist-remove:hover {
++  color: var(--error);
++  background: rgba(255, 107, 107, 0.12);
++}
++
+ /* Screen-reader-only helper */
+ .sr-only {
+   position: absolute;
+@@ -172,6 +315,14 @@
+     flex-direction: column;
+   }
+ 
++  .layout {
++    grid-template-columns: 1fr;
++  }
++
++  .wishlist-panel {
++    position: static;
++  }
++
+   .poster-grid {
+     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+     gap: 0.9rem;

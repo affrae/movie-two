@@ -1,0 +1,382 @@
+diff --git a/app.js b/app.js
+new file mode 100644
+index 00000000..15aa54e7
+--- /dev/null
++++ b/app.js
+@@ -0,0 +1,131 @@
++// Movie Wishlist — TMDb search app (Act I: search only)
++(function () {
++  "use strict";
++
++  const API_BASE = "https://api.themoviedb.org/3";
++  const POSTER_BASE = "https://image.tmdb.org/t/p/w342";
++
++  const form = document.getElementById("search-form");
++  const input = document.getElementById("search-input");
++  const statusEl = document.getElementById("status");
++  const grid = document.getElementById("poster-grid");
++
++  function setStatus(message, isError) {
++    statusEl.textContent = message;
++    statusEl.classList.toggle("error", Boolean(isError));
++  }
++
++  function clearStatus() {
++    setStatus("");
++  }
++
++  function posterUrl(path) {
++    return path ? POSTER_BASE + path : null;
++  }
++
++  function formatYear(dateString) {
++    if (!dateString) return "";
++    const year = dateString.slice(0, 4);
++    return /^\d{4}$/.test(year) ? year : "";
++  }
++
++  function createCard(movie) {
++    const li = document.createElement("li");
++    li.className = "movie-card";
++    li.dataset.movieId = String(movie.id);
++
++    const imgUrl = posterUrl(movie.poster_path);
++    if (imgUrl) {
++      const img = document.createElement("img");
++      img.src = imgUrl;
++      img.alt = movie.title;
++      img.loading = "lazy";
++      li.appendChild(img);
++    } else {
++      const placeholder = document.createElement("div");
++      placeholder.className = "no-poster";
++      placeholder.textContent = "No poster available";
++      li.appendChild(placeholder);
++    }
++
++    const info = document.createElement("div");
++    info.className = "movie-info";
++
++    const title = document.createElement("h2");
++    title.className = "movie-title";
++    title.textContent = movie.title;
++
++    const year = document.createElement("p");
++    year.className = "movie-year";
++    year.textContent = formatYear(movie.release_date);
++
++    info.appendChild(title);
++    info.appendChild(year);
++    li.appendChild(info);
++
++    return li;
++  }
++
++  function renderMovies(movies) {
++    grid.replaceChildren();
++    const fragment = document.createDocumentFragment();
++    movies.forEach(function (movie) {
++      fragment.appendChild(createCard(movie));
++    });
++    grid.appendChild(fragment);
++  }
++
++  async function searchMovies(query) {
++    const url =
++      API_BASE +
++      "/search/movie?api_key=" +
++      encodeURIComponent(TMDB_API_KEY) +
++      "&query=" +
++      encodeURIComponent(query);
++
++    const response = await fetch(url);
++    if (!response.ok) {
++      throw new Error("TMDb API error: " + response.status);
++    }
++    const data = await response.json();
++    return data.results || [];
++  }
++
++  form.addEventListener("submit", async function (event) {
++    event.preventDefault();
++
++    const query = input.value.trim();
++    if (!query) return;
++
++    if (!TMDB_API_KEY) {
++      setStatus(
++        "Missing API key: paste your TMDb API key into config.js and reload.",
++        true
++      );
++      return;
++    }
++
++    const button = form.querySelector("button");
++    button.disabled = true;
++    setStatus("Searching…");
++    grid.replaceChildren();
++
++    try {
++      const movies = await searchMovies(query);
++      if (movies.length === 0) {
++        setStatus('No results found for "' + query + '".');
++      } else {
++        clearStatus();
++        renderMovies(movies);
++      }
++    } catch (err) {
++      console.error(err);
++      setStatus(
++        "Something went wrong while searching. Please try again.",
++        true
++      );
++    } finally {
++      button.disabled = false;
++    }
++  });
++})();
+\ No newline at end of file
+diff --git a/config.js b/config.js
+new file mode 100644
+index 00000000..5c77ffb4
+--- /dev/null
++++ b/config.js
+@@ -0,0 +1,5 @@
++// TMDb API configuration
++// Get a free API key at https://www.themoviedb.org/settings/api
++// Paste your key below, e.g.:
++//   const TMDB_API_KEY = "abc123def456...";
++const TMDB_API_KEY = "YOUR_TMDB_API_KEY";
+\ No newline at end of file
+diff --git a/index.html b/index.html
+new file mode 100644
+index 00000000..1b6d6a2e
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,39 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++  <meta charset="UTF-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1.0">
++  <title>Movie Wishlist</title>
++  <link rel="stylesheet" href="styles.css">
++</head>
++<body>
++  <header class="site-header">
++    <h1>Movie Wishlist</h1>
++    <p class="tagline">Search movies and build your wishlist</p>
++  </header>
++
++  <main>
++    <form id="search-form" class="search-form" role="search" aria-label="Search movies">
++      <label class="sr-only" for="search-input">Search for a movie</label>
++      <input
++        type="search"
++        id="search-input"
++        name="query"
++        placeholder="Search for a movie…"
++        autocomplete="off"
++        required
++      >
++      <button type="submit">Search</button>
++    </form>
++
++    <p id="status" class="status" role="status" aria-live="polite"></p>
++
++    <section id="results" class="results" aria-label="Search results">
++      <ul id="poster-grid" class="poster-grid"></ul>
++    </section>
++  </main>
++
++  <script src="config.js"></script>
++  <script src="app.js"></script>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/styles.css b/styles.css
+new file mode 100644
+index 00000000..92b86855
+--- /dev/null
++++ b/styles.css
+@@ -0,0 +1,179 @@
++/* Movie Wishlist styles (Act I: search only) */
++
++:root {
++  --bg: #14181c;
++  --surface: #1d242b;
++  --text: #e8e8e8;
++  --muted: #9ab;
++  --accent: #90cea1;
++  --error: #ff6b6b;
++  --radius: 8px;
++}
++
++* {
++  box-sizing: border-box;
++}
++
++body {
++  margin: 0;
++  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
++  background: var(--bg);
++  color: var(--text);
++  line-height: 1.5;
++}
++
++.site-header {
++  text-align: center;
++  padding: 2.5rem 1rem 1.5rem;
++}
++
++.site-header h1 {
++  margin: 0;
++  font-size: 2rem;
++}
++
++.tagline {
++  margin: 0.25rem 0 0;
++  color: var(--muted);
++}
++
++main {
++  max-width: 1100px;
++  margin: 0 auto;
++  padding: 0 1rem 3rem;
++}
++
++/* Search form */
++.search-form {
++  display: flex;
++  gap: 0.5rem;
++  max-width: 480px;
++  margin: 0 auto 1.5rem;
++}
++
++.search-form input {
++  flex: 1;
++  padding: 0.65rem 0.9rem;
++  font-size: 1rem;
++  color: var(--text);
++  background: var(--surface);
++  border: 1px solid #2c3640;
++  border-radius: var(--radius);
++}
++
++.search-form input:focus {
++  outline: none;
++  border-color: var(--accent);
++}
++
++.search-form button {
++  padding: 0.65rem 1.25rem;
++  font-size: 1rem;
++  font-weight: 600;
++  color: #14181c;
++  background: var(--accent);
++  border: none;
++  border-radius: var(--radius);
++  cursor: pointer;
++}
++
++.search-form button:hover {
++  filter: brightness(1.1);
++}
++
++.search-form button:disabled {
++  opacity: 0.6;
++  cursor: not-allowed;
++}
++
++/* Status / error area */
++.status {
++  min-height: 1.5rem;
++  margin: 0 0 1.5rem;
++  text-align: center;
++  color: var(--muted);
++}
++
++.status.error {
++  color: var(--error);
++}
++
++/* Poster grid */
++.poster-grid {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
++  gap: 1.25rem;
++}
++
++.movie-card {
++  display: flex;
++  flex-direction: column;
++  background: var(--surface);
++  border-radius: var(--radius);
++  overflow: hidden;
++}
++
++.movie-card img {
++  width: 100%;
++  aspect-ratio: 2 / 3;
++  object-fit: cover;
++  display: block;
++  background: #2c3640;
++}
++
++.movie-card .no-poster {
++  width: 100%;
++  aspect-ratio: 2 / 3;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  color: var(--muted);
++  background: #2c3640;
++  font-size: 0.85rem;
++  text-align: center;
++  padding: 0.5rem;
++}
++
++.movie-card .movie-info {
++  padding: 0.6rem 0.75rem 0.75rem;
++}
++
++.movie-card .movie-title {
++  margin: 0;
++  font-size: 0.95rem;
++  font-weight: 600;
++}
++
++.movie-card .movie-year {
++  margin: 0.15rem 0 0;
++  font-size: 0.85rem;
++  color: var(--muted);
++}
++
++/* Screen-reader-only helper */
++.sr-only {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  padding: 0;
++  margin: -1px;
++  overflow: hidden;
++  clip: rect(0, 0, 0, 0);
++  white-space: nowrap;
++  border: 0;
++}
++
++/* Mobile tweaks */
++@media (max-width: 480px) {
++  .search-form {
++    flex-direction: column;
++  }
++
++  .poster-grid {
++    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
++    gap: 0.9rem;
++  }
++}
+\ No newline at end of file

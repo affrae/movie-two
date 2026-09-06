@@ -1,0 +1,23 @@
+[
+  {
+    "activeForm": "Creating README documentation",
+    "content": "Create README.md with project documentation and usage instructions",
+    "status": "in_progress",
+    "id": "task-1788659012682-0",
+    "title": "Create README.md with project documentation and usage instructions"
+  },
+  {
+    "activeForm": "Adding .gitignore",
+    "content": "Create .gitignore to exclude node_modules and other build artifacts",
+    "status": "pending",
+    "id": "task-1788659012682-1",
+    "title": "Create .gitignore to exclude node_modules and other build artifacts"
+  },
+  {
+    "activeForm": "Adding API key configuration",
+    "content": "Add API key configuration and environment variable support",
+    "status": "pending",
+    "id": "task-1788659012682-2",
+    "title": "Add API key configuration and environment variable support"
+  }
+]
