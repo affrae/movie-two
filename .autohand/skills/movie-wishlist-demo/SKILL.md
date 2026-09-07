@@ -18,10 +18,11 @@ description: Staged three-act single-page movie web app (TMDb search, wishlist, 
 > build, do not ask which act to build, and do not create or modify any files.
 >
 > **Chaining:** if the user supplies more than one trigger up front (e.g.
-> `act1`, `act2`, `act3` in a single message), execute the acts in order in
-> one continuous run — do not stop between acts. Each act still follows its
-> own Execute protocol (both messages, then patch, then verify), but the
-> whole chain completes without waiting for further user input.
+> `act1`, `act2`, `act3` in a single message), execute the acts in order —
+> prompting the user to enter `/clear` between each act. Each act still
+> follows its own Execute protocol (both messages, then patch, then verify,
+> then the `/clear` prompt), but the whole chain completes without waiting
+> for anything other than the `/clear` resets.
 
 This skill builds a self-contained, single-page movie app against the
 [TMDb API](https://developers.themoviedb.org/3). The app is plain files — `index.html`, `styles.css`, `config.js`, `app.js`, plus a generic `storage.js` persistence module added in Act III — with no framework, no
@@ -56,7 +57,7 @@ complete app.
 
 ## How to Execute an Act — MANDATORY
 
-Every act follows the same four-step protocol. Do not skip steps 1 and 2:
+Every act follows the same five-step protocol. Do not skip steps 1 and 2:
 
 1. **Send the "normally" message.** Before touching any files, send the
    user the act's **"What I'd normally do"** message — the exact quoted
@@ -73,6 +74,9 @@ Every act follows the same four-step protocol. Do not skip steps 1 and 2:
    `git apply` command shown in the act.
 4. **Verify.** Check the act's deliverables as described in its "Verify"
    section and report the result.
+5. **Prompt `/clear`.** After every act except the last, prompt the user
+   to enter `/clear` to reset the conversation before the next act. Do not
+   start the next act until the user has entered `/clear`.
 
 **Hard rule — never patch silently.** If you have not sent both messages
 to the user, stop and send them first. Do not apply a patch, do not run
@@ -85,7 +89,8 @@ followed by the "demo shortcut" message), then apply the patch in the same
 turn. This satisfies the hard rule — the user sees both messages before
 the patch — while cutting each act to a single model turn. When chaining
 acts, batch the verification too: apply all patches, then run one combined
-verification pass and report once at the end.
+verification pass and report once at the end — but still prompt the user
+to enter `/clear` between acts.
 
 ### How to Apply a Patch
 
@@ -113,15 +118,20 @@ execution:
 
 1. **Send both messages for Act I** (normally + demo shortcut), then apply
    `act1.patch`.
-2. **Send both messages for Act II**, then apply `act2.patch`.
-3. **Send both messages for Act III**, then apply `act3.patch`.
-4. **Verify once at the end** — run a single combined check covering all
+2. **Prompt `/clear`** — tell the user to enter `/clear` to reset the
+   conversation, then continue with Act II.
+3. **Send both messages for Act II**, then apply `act2.patch`.
+4. **Prompt `/clear`** — tell the user to enter `/clear`, then continue
+   with Act III.
+5. **Send both messages for Act III**, then apply `act3.patch`.
+6. **Verify once at the end** — run a single combined check covering all
    three acts' deliverables and report the final result.
 
 The patches are cumulative, so applying them in order in one run produces
 the complete app. Each act's two messages are still sent before its patch
-(the hard rule is never violated), but no user input is needed between
-acts. This reduces the demo from ~12 round trips to **1**.
+(the hard rule is never violated), and the only user input between acts is
+`/clear`. This reduces the demo from ~12 round trips to **3** (one per act,
+plus the `/clear` resets).
 
 ### Precached Verify (Zero Round Trips)
 
@@ -169,6 +179,10 @@ agent can run it directly with zero model round trips.
 The driver's messages are the exact quoted text from each act's *Execute*
 section, so the hard rule (both messages before the patch) is preserved —
 the messages are printed to the user before the patch is applied.
+
+Between acts, still prompt the user to enter `/clear` — the driver runs
+each act in one pass, but the conversation reset happens between driver
+invocations.
 
 ## Act I — Search App
 
@@ -222,6 +236,8 @@ git apply .autohand/skills/movie-wishlist-demo/patches/act1.patch
 ```
 
 4. **Verify** the deliverables below and report the result.
+5. **Prompt `/clear`.** Tell the user to enter `/clear` to reset the
+   conversation before Act II.
 
 ### Verify
 
@@ -230,7 +246,7 @@ git apply .autohand/skills/movie-wishlist-demo/patches/act1.patch
 - `app.js` is search-only: no wishlist, no `localStorage`.
 - `index.html` loads `config.js` before `app.js`.
 
-5. Do not move on to Act II until you receive ACT II’S Trigger Prompt (or the shortcut `act2`)
+6. Do not move on to Act II until you receive ACT II’S Trigger Prompt (or the shortcut `act2`)
 
 ## Act II — Wishlist
 
@@ -284,6 +300,8 @@ git apply .autohand/skills/movie-wishlist-demo/patches/act2.patch
 ```
 
 4. **Verify** the deliverables below and report the result.
+5. **Prompt `/clear`.** Tell the user to enter `/clear` to reset the
+   conversation before Act III.
 
 ### Verify
 
@@ -291,7 +309,7 @@ git apply .autohand/skills/movie-wishlist-demo/patches/act2.patch
 - `app.js` has `wishlist`, `toggleWishlist`, `setRating`, `renderWishlist`.
 - No `localStorage` anywhere — the wishlist is in memory only.
 
-4. Do not move on to Act III until you receive ACT III’S Trigger Prompt (or the shortcut `act3`)
+6. Do not move on to Act III until you receive ACT III’S Trigger Prompt (or the shortcut `act3`)
 
 ## Act III — Persistence
 
